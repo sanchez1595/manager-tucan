@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { apiService } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -35,73 +36,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-// Mock data con contenido original de clientes
-const mockClients = [
-  {
-    id: 1,
-    name: "Empresa ABC Corp",
-    owner_contact: "María García",
-    owner_email: "maria.garcia@abc-corp.com",
-    owner_phone: "+1 555-0123",
-    status: "Active",
-    projects_count: 3,
-    created_at: "2024-01-15"
-  },
-  {
-    id: 2,
-    name: "Tech Solutions Ltd", 
-    owner_contact: "Carlos Rodríguez",
-    owner_email: "carlos.rodriguez@techsolutions.com",
-    owner_phone: "+1 555-0456",
-    status: "Active",
-    projects_count: 2,
-    created_at: "2024-02-01"
-  },
-  {
-    id: 3,
-    name: "Digital Innovation SA",
-    owner_contact: "Luis Fernández",
-    owner_email: "luis.fernandez@digitalinnovation.com", 
-    owner_phone: "+1 555-0789",
-    status: "Inactive",
-    projects_count: 1,
-    created_at: "2024-02-15"
-  },
-  {
-    id: 4,
-    name: "Global Tech Inc",
-    owner_contact: "Ana Torres",
-    owner_email: "ana.torres@globaltech.com",
-    owner_phone: "+1 555-0321", 
-    status: "Active",
-    projects_count: 5,
-    created_at: "2024-03-01"
-  },
-  {
-    id: 5,
-    name: "Innovation Company",
-    owner_contact: "Pedro Martínez",
-    owner_email: "pedro.martinez@innovation.com",
-    owner_phone: "+1 555-0654",
-    status: "Suspended",
-    projects_count: 0,
-    created_at: "2024-02-20"
-  },
-  {
-    id: 6,
-    name: "Future Corporation",
-    owner_contact: "Carmen López",
-    owner_email: "carmen.lopez@future-corp.com",
-    owner_phone: "+1 555-0987",
-    status: "Active",
-    projects_count: 2,
-    created_at: "2024-03-10"
-  }
-]
 
 export default function ClientsPage() {
   const router = useRouter()
-  const [clients, setClients] = useState(mockClients)
+  const [clients, setClients] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalClients, setTotalClients] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedRows, setSelectedRows] = useState<number[]>([])
@@ -110,55 +51,80 @@ export default function ClientsPage() {
   const [isCreateClientOpen, setIsCreateClientOpen] = useState(false)
   const [newClient, setNewClient] = useState({
     name: "",
-    owner_contact: "",
-    owner_email: "",
-    owner_phone: ""
+    legal_representative: "",
+    contact_person: "",
+    email: "",
+    phone: ""
   })
 
-  const filteredClients = clients.filter(client => {
-    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         client.owner_contact.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         client.owner_email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === "all" || client.status.toLowerCase() === statusFilter.toLowerCase()
-    return matchesSearch && matchesStatus
-  })
+  useEffect(() => {
+    loadClients()
+  }, [currentPage, rowsPerPage, searchTerm, statusFilter])
 
-  const totalPages = Math.ceil(filteredClients.length / rowsPerPage)
-  const startIndex = (currentPage - 1) * rowsPerPage
-  const paginatedClients = filteredClients.slice(startIndex, startIndex + rowsPerPage)
+  const loadClients = async () => {
+    try {
+      setLoading(true)
+      const response = await apiService.getClients({
+        page: currentPage,
+        per_page: rowsPerPage,
+        search: searchTerm || undefined
+      })
+      setClients(response.clients)
+      setTotalClients(response.total)
+      setTotalPages(response.total_pages)
+    } catch (error) {
+      console.error('Error loading clients:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredClients = clients
+  const paginatedClients = clients
 
   const handleClientClick = (clientId: number) => {
     router.push(`/clients/${clientId}`)
   }
 
-  const handleCreateClient = () => {
-    const client = {
-      id: Date.now(),
-      ...newClient,
-      status: "Active",
-      projects_count: 0,
-      created_at: new Date().toISOString().split('T')[0]
+  const handleCreateClient = async () => {
+    try {
+      await apiService.createClient(newClient)
+      setNewClient({
+        name: "",
+        legal_representative: "",
+        contact_person: "",
+        email: "",
+        phone: ""
+      })
+      setIsCreateClientOpen(false)
+      loadClients()
+    } catch (error) {
+      console.error('Error creating client:', error)
     }
-    setClients(prev => [...prev, client])
-    setNewClient({
-      name: "",
-      owner_contact: "",
-      owner_email: "",
-      owner_phone: ""
-    })
-    setIsCreateClientOpen(false)
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Active":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">Activo</Badge>
-      case "Inactive":
-        return <Badge variant="secondary" className="bg-gray-100 text-gray-700">Inactivo</Badge>
-      case "Suspended":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200">Suspendido</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
+  const handleDeleteClient = async (clientId: number) => {
+    if (confirm('¿Está seguro de que desea eliminar este cliente?')) {
+      try {
+        await apiService.deleteClient(clientId)
+        loadClients()
+      } catch (error) {
+        console.error('Error deleting client:', error)
+        alert('Error al eliminar el cliente. Puede que tenga proyectos activos.')
+      }
+    }
+  }
+
+  const getStatusBadge = (client: any) => {
+    const projectCount = client.projects?.length || 0
+    const hasActiveProjects = client.projects?.some((p: any) => p.status === 'active') || false
+    
+    if (hasActiveProjects) {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">Activo</Badge>
+    } else if (projectCount > 0) {
+      return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200">Inactivo</Badge>
+    } else {
+      return <Badge variant="secondary" className="bg-gray-100 text-gray-700">Sin proyectos</Badge>
     }
   }
 
@@ -196,32 +162,42 @@ export default function ClientsPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="owner_contact">Nombre del contacto</Label>
+                  <Label htmlFor="legal_representative">Representante legal</Label>
                   <Input
-                    id="owner_contact"
-                    value={newClient.owner_contact}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, owner_contact: e.target.value }))}
+                    id="legal_representative"
+                    value={newClient.legal_representative}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, legal_representative: e.target.value }))}
                     placeholder="María García"
                     className="mt-2 h-10"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="owner_email">Email del contacto</Label>
+                  <Label htmlFor="contact_person">Persona de contacto</Label>
                   <Input
-                    id="owner_email"
-                    type="email"
-                    value={newClient.owner_email}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, owner_email: e.target.value }))}
-                    placeholder="maria.garcia@empresa.com"
+                    id="contact_person"
+                    value={newClient.contact_person}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, contact_person: e.target.value }))}
+                    placeholder="Juan Pérez"
                     className="mt-2 h-10"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="owner_phone">Teléfono del contacto</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="owner_phone"
-                    value={newClient.owner_phone}
-                    onChange={(e) => setNewClient(prev => ({ ...prev, owner_phone: e.target.value }))}
+                    id="email"
+                    type="email"
+                    value={newClient.email}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="contacto@empresa.com"
+                    className="mt-2 h-10"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    value={newClient.phone}
+                    onChange={(e) => setNewClient(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="+1 555-0123"
                     className="mt-2 h-10"
                   />
@@ -230,7 +206,7 @@ export default function ClientsPage() {
                   <Button 
                     onClick={handleCreateClient}
                     className="flex-1 bg-[#4267b2] hover:bg-[#345995] h-10"
-                    disabled={!newClient.name || !newClient.owner_contact || !newClient.owner_email}
+                    disabled={!newClient.name || !newClient.email}
                   >
                     Crear Cliente
                   </Button>
@@ -278,9 +254,6 @@ export default function ClientsPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-gray-200">
-                <TableHead className="w-12">
-                  <input type="checkbox" className="rounded border-gray-300" />
-                </TableHead>
                 <TableHead className="text-gray-700 font-medium">Nombre</TableHead>
                 <TableHead className="text-gray-700 font-medium">Contacto</TableHead>
                 <TableHead className="text-gray-700 font-medium">Email</TableHead>
@@ -297,30 +270,23 @@ export default function ClientsPage() {
                   className="hover:bg-gray-50 cursor-pointer border-gray-100"
                   onClick={() => handleClientClick(client.id)}
                 >
-                  <TableCell>
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-gray-300"
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </TableCell>
                   <TableCell className="font-medium text-gray-900">
                     {client.name}
                   </TableCell>
                   <TableCell className="text-gray-900">
-                    {client.owner_contact}
+                    {client.contact_person || client.legal_representative}
                   </TableCell>
                   <TableCell className="text-blue-600 hover:text-blue-800">
-                    {client.owner_email}
+                    {client.email}
                   </TableCell>
                   <TableCell className="text-gray-700">
-                    {client.owner_phone}
+                    {client.phone || 'N/A'}
                   </TableCell>
                   <TableCell>
-                    {getStatusBadge(client.status)}
+                    {getStatusBadge(client)}
                   </TableCell>
                   <TableCell className="text-gray-700">
-                    {client.projects_count} proyecto{client.projects_count !== 1 ? 's' : ''}
+                    {client.projects?.length || 0} proyecto{(client.projects?.length || 0) !== 1 ? 's' : ''}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -334,8 +300,13 @@ export default function ClientsPage() {
                           Ver detalles
                         </DropdownMenuItem>
                         <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem>Suspender</DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteClient(client.id)
+                          }}
+                        >
                           Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -358,10 +329,10 @@ export default function ClientsPage() {
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-gray-900 truncate">{client.name}</h3>
-                  <p className="text-sm text-gray-600 truncate">{client.owner_contact}</p>
+                  <p className="text-sm text-gray-600 truncate">{client.contact_person || client.legal_representative}</p>
                 </div>
                 <div className="flex items-center gap-2 ml-2">
-                  {getStatusBadge(client.status)}
+                  {getStatusBadge(client)}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -373,8 +344,13 @@ export default function ClientsPage() {
                         Ver detalles
                       </DropdownMenuItem>
                       <DropdownMenuItem>Editar</DropdownMenuItem>
-                      <DropdownMenuItem>Suspender</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
+                      <DropdownMenuItem 
+                        className="text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteClient(client.id)
+                        }}
+                      >
                         Eliminar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -385,15 +361,15 @@ export default function ClientsPage() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-blue-600 truncate">{client.owner_email}</span>
+                  <span className="text-sm text-blue-600 truncate">{client.email}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">{client.owner_phone}</span>
+                  <span className="text-sm text-gray-600">{client.phone || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-xs text-gray-500">
-                    {client.projects_count} proyecto{client.projects_count !== 1 ? 's' : ''}
+                    {client.projects?.length || 0} proyecto{(client.projects?.length || 0) !== 1 ? 's' : ''}
                   </span>
                   <span className="text-xs text-gray-500">
                     Creado: {new Date(client.created_at).toLocaleDateString('es-ES')}
@@ -405,9 +381,15 @@ export default function ClientsPage() {
         </div>
 
         {/* Paginación */}
+        {loading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="text-gray-500">Cargando clientes...</div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t border-gray-200">
           <div className="text-sm text-gray-700 hidden md:block">
-            {selectedRows.length} de {filteredClients.length} fila(s) seleccionadas.
+            Total: {totalClients} cliente{totalClients !== 1 ? 's' : ''}
           </div>
           
           <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full sm:w-auto">

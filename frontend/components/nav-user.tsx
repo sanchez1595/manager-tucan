@@ -8,6 +8,7 @@ import {
   LogOut,
   Sparkles,
 } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
 import {
   Avatar,
@@ -27,14 +28,26 @@ import {
 export const NavUser = ({
   user,
 }: {
-  user: {
+  user?: {
     name: string
     email: string
     avatar: string
   }
 }) => {
+  const { user: authUser, logout } = useAuth()
+  
+  const currentUser = user || {
+    name: authUser?.username || 'Usuario',
+    email: authUser?.email || 'email@example.com',
+    avatar: ''
+  }
+
   const truncateEmail = (email: string): string => {
     return email.length > 15 ? `${email.substring(0, 15)}...` : email
+  }
+
+  const handleLogout = () => {
+    logout()
   }
 
   return (
@@ -42,14 +55,14 @@ export const NavUser = ({
       <DropdownMenuTrigger asChild>
         <div className="flex items-center gap-2 cursor-pointer hover:bg-blue-700/20 rounded-lg p-1 transition-colors">
           <Avatar className="h-6 w-6 bg-[#19C37D]">
-            <AvatarImage src={user.avatar} alt={user.name} />
+            <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
             <AvatarFallback className="bg-[#19C37D] text-black font-medium text-xs">
-              {user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+              {currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="text-white text-xs">
-            <div className="font-medium">{user.name}</div>
-            <div className="text-blue-100 text-xs">{truncateEmail(user.email)}</div>
+            <div className="font-medium">{currentUser.name}</div>
+            <div className="text-blue-100 text-xs">{truncateEmail(currentUser.email)}</div>
           </div>
           <ChevronsUpDown className="ml-auto h-3 w-3 text-blue-200" />
         </div>
@@ -63,43 +76,32 @@ export const NavUser = ({
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
             <Avatar className="h-8 w-8 bg-[#19C37D]">
-              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
               <AvatarFallback className="bg-[#19C37D] text-black font-medium text-sm">
-                {user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                {currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">{user.name}</span>
-              <span className="truncate text-xs">{user.email}</span>
+              <span className="truncate font-semibold">{currentUser.name}</span>
+              <span className="truncate text-xs">{currentUser.email}</span>
             </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem>
-            <Sparkles />
-            Upgrade to Pro
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
             <BadgeCheck />
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <CreditCard />
-            Billing
+            Mi Perfil
           </DropdownMenuItem>
           <DropdownMenuItem>
             <Bell />
-            Notifications
+            Notificaciones
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
           <LogOut />
-          Log out
+          Cerrar Sesión
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

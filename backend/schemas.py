@@ -168,7 +168,7 @@ class ClientUser(ClientUserBase):
 
 # Response schemas
 class ClientListResponse(BaseModel):
-    clients: List[Client]
+    clients: List[ClientWithProjects]
     total: int
     page: int
     per_page: int

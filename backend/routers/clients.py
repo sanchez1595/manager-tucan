@@ -64,9 +64,9 @@ async def get_clients(
     total = query.count()
     total_pages = math.ceil(total / per_page)
     
-    # Aplicar paginación
+    # Aplicar paginación y cargar proyectos
     offset = (page - 1) * per_page
-    clients = query.offset(offset).limit(per_page).all()
+    clients = query.options(joinedload(Client.projects)).offset(offset).limit(per_page).all()
     
     return ClientListResponse(
         clients=clients,
